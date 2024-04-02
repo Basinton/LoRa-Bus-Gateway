@@ -1,18 +1,32 @@
+#include <WiFi.h>
 #include <Arduino.h>
 
-// put function declarations here:
-int myFunction(int, int);
+#include "button.h"
+#include "lora.h"
+#include "ota.h"
+#include "led.h"
+#include "rs485.h"
+#include "station.h"
 
-void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+void setup()
+{
+    delay(1000);
+
+    Serial.begin(115200);
+
+    lora_init();
+    led_init();
+    button_init();
+
+    stationInit();
+    rs485_init();
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-}
+uint32_t startCycle = 0;
+void loop()
+{
+    while (millis() - startCycle < 50);
+    startCycle = millis();
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+    rs485_task();
 }
