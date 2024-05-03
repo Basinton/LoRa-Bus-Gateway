@@ -15,41 +15,47 @@ int32_t stationLNG = STATION_LNG * 10000000;
 /* Variables -----------------------------------------------------------------*/
 TaskHandle_t stationTaskHandle = NULL;
 
-uint8_t stationLoraSendMessage[50] = {0};
-uint8_t responseToBoard[128]       = {0};
-uint16_t responseToBoardCRC        = 0;
+char debug_buffer[50];
 
-uint8_t isThereRequest   = 0;
-uint8_t isThereBusCancel = 0;
-uint8_t isBusAccept      = 0;
-uint8_t isBusPass        = 0;
+BUS_ID busID = BUS_UNKNOWN;
 
-uint8_t isBusReAckBusPass   = 0;
-uint8_t isBusReAckBusCancel = 0;
+uint8_t stationLoraSendMessage[10] = {0};
+uint8_t responseToBoard[128] = {0};
+uint16_t responseToBoardCRC = 0;
 
-uint8_t isBoardReAckStationAccept = 0;
-uint8_t isNotifyBusAcceptAck      = 0;
-uint8_t isNotifyBusPassAck        = 0;
-uint8_t isNotifyBusCancelAck      = 0;
+uint8_t errorCount[BUS_COUNT];
 
-uint8_t isBoardReAckPassengerCancel = 0;
-uint8_t isPassengerCancel           = 0;
-uint8_t isPassengerCancelAck        = 0;
-uint8_t isBusReAckPassengerCancel   = 0;
+uint8_t isThereRequest[BUS_COUNT] = {0};
+uint8_t isThereBusCancel[BUS_COUNT] = {0};
+uint8_t isBusAccept[BUS_COUNT] = {0};
+uint8_t isBusPass[BUS_COUNT] = {0};
 
-SYSTEM_STATE busHandleState = INIT;
-int busHandleTimeout        = 0;
-BUS_RESPONSE busResponse    = {0};
+uint8_t isBusReAckBusPass[BUS_COUNT] = {0};
+uint8_t isBusReAckBusCancel[BUS_COUNT] = {0};
 
-uint8_t requestID = 0;
+uint8_t isBoardReAckStationAccept[BUS_COUNT] = {0};
+uint8_t isNotifyBusAcceptAck[BUS_COUNT] = {0};
+uint8_t isNotifyBusPassAck[BUS_COUNT] = {0};
+uint8_t isNotifyBusCancelAck[BUS_COUNT] = {0};
+
+uint8_t isBoardReAckPassengerCancel[BUS_COUNT] = {0};
+uint8_t isPassengerCancel[BUS_COUNT] = {0};
+uint8_t isPassengerCancelAck[BUS_COUNT] = {0};
+uint8_t isBusReAckPassengerCancel[BUS_COUNT] = {0};
+
+SYSTEM_STATE busHandleState[BUS_COUNT] = {INIT};
+uint8_t busHandleTimeout[BUS_COUNT] = {0};
+BUS_RESPONSE busResponse[BUS_COUNT] = {0};
+
+uint8_t requestID[BUS_COUNT] = {0};
 
 /* Functions -----------------------------------------------------------------*/
-void stationRequestToBus(void);
+void stationRequestToBus(BUS_ID busID);
 void stationCancleToBus(void);
-void stationAckToBus(SYSTEM_STATE state);
-void stationAckToBoard(SYSTEM_STATE state);
+void stationAckToBus(BUS_ID busID, SYSTEM_STATE state);
+void stationAckToBoard(BUS_ID busID, SYSTEM_STATE state);
 
-void stationFsmResetState(SYSTEM_STATE state);
+void stationFsmResetState(BUS_ID busID, SYSTEM_STATE state);
 void stationFsm(void);
 
 void stationAckDebuger(void);
@@ -77,345 +83,431 @@ void stationInit(void)
     Serial.println("sta: \t [init]");
 }
 
-void stationFsmResetState(SYSTEM_STATE state)
+void stationFsmResetState(BUS_ID busID = BUS_UNKNOWN, SYSTEM_STATE state = INIT)
 {
     switch (state)
     {
-        case WAITING:
-            isThereRequest   = 0;
-            isThereBusCancel = 0;
-            isBusAccept      = 0;
-            isBusPass        = 0;
+    case INIT:
+        memset(isThereRequest, 0, sizeof(isThereRequest));
+        memset(isThereBusCancel, 0, sizeof(isThereBusCancel));
+        memset(isBusPass, 0, sizeof(isBusPass));
 
-            isBusReAckBusPass   = 0;
-            isBusReAckBusCancel = 0;
+        memset(isBusReAckBusPass, 0, sizeof(isBusReAckBusPass));
+        memset(isBusReAckBusCancel, 0, sizeof(isBusReAckBusCancel));
 
-            isBoardReAckStationAccept = 0;
-            isNotifyBusAcceptAck      = 0;
-            isNotifyBusCancelAck      = 0;
+        memset(isBoardReAckStationAccept, 0, sizeof(isBoardReAckStationAccept));
+        memset(isNotifyBusAcceptAck, 0, sizeof(isNotifyBusAcceptAck));
+        memset(isNotifyBusCancelAck, 0, sizeof(isNotifyBusCancelAck));
+        break;
+    case WAITING:
 
-            Serial.println("sta: \t [fsm] waiting");
-            break;
+        Serial.println("sta: \t [fsm] waiting");
+        break;
 
-        case STATION_NOTIFY_ACCEPT_TO_BOARD:
-            stationAckToBoard(STATION_NOTIFY_ACCEPT_TO_BOARD);
+    case STATION_NOTIFY_ACCEPT_TO_BOARD:
+        stationAckToBoard(busID, STATION_NOTIFY_ACCEPT_TO_BOARD);
 
-            Serial.println("sta: \t [fsm] notify station accept");
-            break;
+        sprintf(debug_buffer, "sta: notify board accept bus %d", busID);
+        Serial.println(debug_buffer);
+        break;
 
-        case REQUEST_TO_BUS:
-            stationRequestToBus();
-            busHandleTimeout = 40;
+    case REQUEST_TO_BUS:
+        stationRequestToBus(busID);
+        busHandleTimeout[busID] = 40;
 
-            Serial.println("sta: \t [fsm] request to bus");
-            break;
+        sprintf(debug_buffer, "sta: request to bus %d", busID);
+        Serial.println(debug_buffer);
+        break;
 
-        case STATION_NOTIFY_BUS_ACCEPT_TO_BOARD:
-            stationAckToBoard(STATION_NOTIFY_BUS_ACCEPT_TO_BOARD);
-            busHandleTimeout = 40;
+    case STATION_NOTIFY_BUS_ACCEPT_TO_BOARD:
+        stationAckToBoard(busID, STATION_NOTIFY_BUS_ACCEPT_TO_BOARD);
+        busHandleTimeout[busID] = 40;
 
-            Serial.println("sta: \t [fsm] notify bus accept");
-            break;
+        sprintf(debug_buffer, "sta: \t [fsm] notify bus %d accept", busID);
+        Serial.println(debug_buffer);
+        break;
 
-        case BUS_ACCEPT:
-            // Serial.printf("sta: \t [fsm] bus accept (request id=%d, hi=%d, lo=%d)\n", busResponse.id, busResponse.addressHI, busResponse.addressLO);
-            Serial.println("sta: \t [fsm] bus accept");
-            break;
+    case BUS_ACCEPT:
+        // Serial.printf("sta: \t [fsm] bus accept (request id=%d, hi=%d, lo=%d)\n", busResponse.id, busResponse.addressHI, busResponse.addressLO);
+        sprintf(debug_buffer, "sta: bus %d accept", busID);
+        Serial.println(debug_buffer);
+        break;
 
-        case STATION_NOTIFY_BUS_PASS_TO_BOARD:
-            stationAckToBoard(STATION_NOTIFY_BUS_PASS_TO_BOARD);
-            busHandleTimeout = 40;
+    case STATION_NOTIFY_BUS_PASS_TO_BOARD:
+        stationAckToBoard(busID, STATION_NOTIFY_BUS_PASS_TO_BOARD);
+        busHandleTimeout[busID] = 40;
 
-            Serial.println("sta: \t [fsm] notify bus pass");
-            break;
+        sprintf(debug_buffer, "sta: notify bus %d pass", busID);
+        Serial.println(debug_buffer);
+        break;
 
-        case BUS_PASS:
-            stationAckToBus(BUS_PASS);
-            Serial.println("sta: \t [fsm] bus pass");
-            break;
+    case BUS_PASS:
+        stationAckToBus(busID, BUS_PASS);
 
-        case STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD:
-            stationAckToBoard(STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD);
-            busHandleTimeout = 40;
+        sprintf(debug_buffer, "sta: bus %d pass", busID);
+        Serial.println(debug_buffer);
+        break;
 
-            Serial.println("sta: \t [fsm] notify bus cancel");
-            break;
+    case STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD:
+        stationAckToBoard(busID, STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD);
+        busHandleTimeout[busID] = 40;
 
-        case DRIVER_CANCEL:
-            stationAckToBus(DRIVER_CANCEL);
-            busHandleTimeout = 40;
+        sprintf(debug_buffer, "sta: notify bus %d cancel", busID);
+        Serial.println(debug_buffer);
+        break;
 
-            Serial.println("sta: \t [fsm] bus cancel");
-            break;
+    case DRIVER_CANCEL:
+        stationAckToBus(busID, DRIVER_CANCEL);
+        busHandleTimeout[busID] = 40;
 
-        case BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION:
-            stationAckToBoard(BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION);
+        sprintf(debug_buffer, "sta: bus %d cancel", busID);
+        Serial.println(debug_buffer);
+        break;
 
-            Serial.println("sta: \t [fsm] notify passenger cancel");
-            break;
+    case BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION:
+        stationAckToBoard(busID, BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION);
 
-        case PASSENGER_CANCEL:
-            stationAckToBus(PASSENGER_CANCEL);
-            busHandleTimeout = 40;
+        sprintf(debug_buffer, "sta: notify passenger %d cancel", busID);
+        Serial.println(debug_buffer);
+        break;
 
-            Serial.println("sta: \t [fsm] passenger cancel");
-            break;
+    case PASSENGER_CANCEL:
+        stationAckToBus(busID, PASSENGER_CANCEL);
+        busHandleTimeout[busID] = 40;
 
-        case FINISHED:
-            requestID = (requestID + 1) % 256;
+        sprintf(debug_buffer, "sta: passenger %d cancel", busID);
+        Serial.println(debug_buffer);
+        break;
 
-            Serial.println("sta: \t [fsm] finished");
-            break;
+    case FINISHED:
+        requestID[busID] = (requestID[busID] + 1) % 256;
 
-        default:
-            break;
+        sprintf(debug_buffer, "sta: bus %d finished", busID);
+        Serial.println(debug_buffer);
+        break;
+
+    case ERROR_TIMEOUT:
+        sprintf(debug_buffer, "sta: bus %d request error - TIMEOUT", busID);
+        Serial.println(debug_buffer);
+        break;
+
+    default:
+        break;
     }
 }
 
 void stationFsm(void)
 {
-    switch (busHandleState)
+    for (int bus_i = BUS_00; bus_i <= BUS_04; bus_i++)
     {
+        busID = (BUS_ID)bus_i; // Cast integer back to BUS_ID for usage
+        switch (busHandleState[busID])
+        {
         case INIT:
-            requestID = 0;
+            requestID[busID] = 0;
 
-            stationFsmResetState(WAITING);
-            busHandleState = WAITING;
+            stationFsmResetState(busID, INIT);
+            busHandleState[busID] = WAITING;
             break;
 
         case WAITING:
-            if (isThereRequest || button_keycode() == 40)
-            // if (isThereRequest)
-            {
-                isThereRequest = 0;
 
-                stationFsmResetState(STATION_NOTIFY_ACCEPT_TO_BOARD);
-                busHandleState = STATION_NOTIFY_ACCEPT_TO_BOARD;
+            if (isThereRequest[busID])
+            {
+                isThereRequest[busID] = 0;
+
+                stationFsmResetState(busID, STATION_NOTIFY_ACCEPT_TO_BOARD);
+                busHandleState[busID] = STATION_NOTIFY_ACCEPT_TO_BOARD;
             }
             break;
 
         case STATION_NOTIFY_ACCEPT_TO_BOARD:
-            stationFsmResetState(REQUEST_TO_BUS);
-            busHandleState = REQUEST_TO_BUS;
+            stationFsmResetState(busID, REQUEST_TO_BUS);
+            busHandleState[busID] = REQUEST_TO_BUS;
             break;
 
         case REQUEST_TO_BUS:
-            if (isBusAccept)
+            if (isBusAccept[busID])
             {
-                isBusAccept = 0;
+                isBusAccept[busID] = 0;
 
-                stationFsmResetState(STATION_NOTIFY_BUS_ACCEPT_TO_BOARD);
-                busHandleState = STATION_NOTIFY_BUS_ACCEPT_TO_BOARD;
+                stationFsmResetState(busID, STATION_NOTIFY_BUS_ACCEPT_TO_BOARD);
+                busHandleState[busID] = STATION_NOTIFY_BUS_ACCEPT_TO_BOARD;
             }
-            else if (--busHandleTimeout == 0)
+            else if (--busHandleTimeout[busID] == 0)
             {
-                stationFsmResetState(REQUEST_TO_BUS);
-                busHandleState = REQUEST_TO_BUS;
+                if (errorCount[busID] >= 20)
+                {
+                    errorCount[busID] = 0;
+                    stationFsmResetState(busID, ERROR_TIMEOUT);
+                    busHandleState[busID] = ERROR_TIMEOUT;
+                }
+                errorCount[busID]++;
+                stationFsmResetState(busID, REQUEST_TO_BUS);
+                busHandleState[busID] = REQUEST_TO_BUS;
             }
-
             break;
 
         case STATION_NOTIFY_BUS_ACCEPT_TO_BOARD:
-            if (isNotifyBusAcceptAck)
-            {
-                isNotifyBusAcceptAck = 0;
 
-                stationFsmResetState(BUS_ACCEPT);
-                busHandleState = BUS_ACCEPT;
-            }
-            else if (--busHandleTimeout == 0)
+            if (isNotifyBusAcceptAck[busID])
             {
-                stationFsmResetState(STATION_NOTIFY_BUS_ACCEPT_TO_BOARD);
-                busHandleState = STATION_NOTIFY_BUS_ACCEPT_TO_BOARD;
+                isNotifyBusAcceptAck[busID] = 0;
+
+                stationFsmResetState(busID, BUS_ACCEPT);
+                busHandleState[busID] = BUS_ACCEPT;
             }
+            else if (--busHandleTimeout[busID] == 0)
+            {
+                if (errorCount[busID] >= 20)
+                {
+                    errorCount[busID] = 0;
+                    stationFsmResetState(busID, ERROR_TIMEOUT);
+                    busHandleState[busID] = ERROR_TIMEOUT;
+                }
+                errorCount[busID]++;
+                stationFsmResetState(busID, STATION_NOTIFY_BUS_ACCEPT_TO_BOARD);
+                busHandleState[busID] = STATION_NOTIFY_BUS_ACCEPT_TO_BOARD;
+            }
+
             break;
 
         case BUS_ACCEPT:
-            if (isBusPass)
-            {
-                isBusPass = 0;
 
-                stationFsmResetState(STATION_NOTIFY_BUS_PASS_TO_BOARD);
-                busHandleState = STATION_NOTIFY_BUS_PASS_TO_BOARD;
-            }
-            else if (isThereBusCancel)
+            if (isBusPass[busID])
             {
-                isThereBusCancel = 0;
+                isBusPass[busID] = 0;
 
-                stationFsmResetState(STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD);
-                busHandleState = STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD;
+                stationFsmResetState(busID, STATION_NOTIFY_BUS_PASS_TO_BOARD);
+                busHandleState[busID] = STATION_NOTIFY_BUS_PASS_TO_BOARD;
             }
+            else if (isThereBusCancel[busID])
+            {
+                isThereBusCancel[busID] = 0;
+
+                stationFsmResetState(busID, STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD);
+                busHandleState[busID] = STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD;
+            }
+
             break;
 
         case STATION_NOTIFY_BUS_PASS_TO_BOARD:
-            if (isNotifyBusPassAck)
-            {
-                isNotifyBusPassAck = 0;
 
-                stationFsmResetState(BUS_PASS);
-                busHandleState = BUS_PASS;
-            }
-            else if (--busHandleTimeout == 0)
+            if (isNotifyBusPassAck[busID])
             {
-                stationFsmResetState(STATION_NOTIFY_BUS_PASS_TO_BOARD);
-                busHandleState = STATION_NOTIFY_BUS_PASS_TO_BOARD;
+                isNotifyBusPassAck[busID] = 0;
+
+                stationFsmResetState(busID, BUS_PASS);
+                busHandleState[busID] = BUS_PASS;
             }
+            else if (--busHandleTimeout[busID] == 0)
+            {
+                if (errorCount[busID] >= 20)
+                {
+                    errorCount[busID] = 0;
+                    stationFsmResetState(busID, ERROR_TIMEOUT);
+                    busHandleState[busID] = ERROR_TIMEOUT;
+                }
+                errorCount[busID]++;
+                stationFsmResetState(busID, STATION_NOTIFY_BUS_PASS_TO_BOARD);
+                busHandleState[busID] = STATION_NOTIFY_BUS_PASS_TO_BOARD;
+            }
+
             break;
 
         case BUS_PASS:
-            stationFsmResetState(FINISHED);
-            busHandleState = FINISHED;
+            stationFsmResetState(busID, FINISHED);
+            busHandleState[busID] = FINISHED;
             break;
 
         case STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD:
-            if (isNotifyBusCancelAck)
-            {
-                isNotifyBusCancelAck = 0;
 
-                stationFsmResetState(DRIVER_CANCEL);
-                busHandleState = DRIVER_CANCEL;
-            }
-            else if (--busHandleTimeout == 0)
+            if (isNotifyBusCancelAck[busID])
             {
-                stationFsmResetState(STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD);
-                busHandleState = STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD;
+                isNotifyBusCancelAck[busID] = 0;
+
+                stationFsmResetState(busID, DRIVER_CANCEL);
+                busHandleState[busID] = DRIVER_CANCEL;
+            }
+            else if (--busHandleTimeout[busID] == 0)
+            {
+                if (errorCount[busID] >= 20)
+                {
+                    errorCount[busID] = 0;
+                    stationFsmResetState(busID, ERROR_TIMEOUT);
+                    busHandleState[busID] = ERROR_TIMEOUT;
+                }
+                errorCount[busID]++;
+                stationFsmResetState(busID, STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD);
+                busHandleState[busID] = STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD;
             }
 
             break;
 
         case DRIVER_CANCEL:
-            stationFsmResetState(FINISHED);
-            busHandleState = FINISHED;
+            stationFsmResetState(busID, FINISHED);
+            busHandleState[busID] = FINISHED;
             break;
 
         case BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION:
-            stationFsmResetState(PASSENGER_CANCEL);
-            busHandleState = PASSENGER_CANCEL;
+            stationFsmResetState(busID, PASSENGER_CANCEL);
+            busHandleState[busID] = PASSENGER_CANCEL;
             break;
 
         case PASSENGER_CANCEL:
-            if (isPassengerCancelAck)
-            {
-                isPassengerCancelAck = 0;
 
-                stationFsmResetState(FINISHED);
-                busHandleState = FINISHED;
-            }
-            else if (--busHandleTimeout == 0)
+            if (isPassengerCancelAck[busID])
             {
-                stationFsmResetState(PASSENGER_CANCEL);
-                busHandleState = PASSENGER_CANCEL;
+                isPassengerCancelAck[busID] = 0;
+
+                stationFsmResetState(busID, FINISHED);
+                busHandleState[busID] = FINISHED;
             }
+            else if (--busHandleTimeout[busID] == 0)
+            {
+                if (errorCount[busID] >= 20)
+                {
+                    errorCount[busID] = 0;
+                    stationFsmResetState(busID, ERROR_TIMEOUT);
+                    busHandleState[busID] = ERROR_TIMEOUT;
+                }
+                errorCount[busID]++;
+                stationFsmResetState(busID, PASSENGER_CANCEL);
+                busHandleState[busID] = PASSENGER_CANCEL;
+            }
+
+            break;
 
         case FINISHED:
-            stationFsmResetState(WAITING);
-            busHandleState = WAITING;
+            stationFsmResetState(busID, WAITING);
+            busHandleState[busID] = WAITING;
+            break;
 
+        case ERROR_TIMEOUT:
+            stationFsmResetState(busID, WAITING);
+            busHandleState[busID] = WAITING;
             break;
 
         default:
-            busHandleState = INIT;
+            busHandleState[busID] = INIT;
             break;
+        }
     }
 }
 
 void stationAckDebuger(void)
 {
-    if (isBusReAckBusPass)
+    for (int bus_i = BUS_00; bus_i <= BUS_04; bus_i++)
     {
-        isBusReAckBusPass = 0;
+        busID = (BUS_ID)bus_i; // Cast integer back to BUS_ID for usage
 
-        stationAckToBus(BUS_PASS);
-        Serial.println("sta: \t [ReAck to bus] finish");
-    }
+        if (isBusReAckBusPass[busID])
+        {
+            isBusReAckBusPass[busID] = 0;
 
-    if (isBusReAckBusCancel)
-    {
-        isBusReAckBusCancel = 0;
+            stationAckToBus(busID, BUS_PASS);
+            Serial.println("sta: \t [ReAck to bus] finish");
+        }
 
-        stationAckToBus(DRIVER_CANCEL);
-        Serial.println("sta: \t [ReAck to bus] cancel");
+        if (isBusReAckBusCancel[busID])
+        {
+            isBusReAckBusCancel[busID] = 0;
+
+            stationAckToBus(busID, DRIVER_CANCEL);
+            Serial.println("sta: \t [ReAck to bus] cancel");
+        }
     }
 }
 
 void boardAckDebuger(void)
 {
-    if (isBoardReAckStationAccept)
+    for (int bus_i = BUS_00; bus_i <= BUS_04; bus_i++)
     {
-        isBoardReAckStationAccept = 0;
+        busID = (BUS_ID)bus_i; // Cast integer back to BUS_ID for usage
 
-        stationAckToBoard(STATION_NOTIFY_ACCEPT_TO_BOARD);
-        Serial.println("sta: \t [ReAck to board] station accept");
-    }
+        if (isBoardReAckStationAccept[busID])
+        {
+            isBoardReAckStationAccept[busID] = 0;
 
-    if (isBoardReAckPassengerCancel)
-    {
-        isBoardReAckPassengerCancel = 0;
+            stationAckToBoard(busID, STATION_NOTIFY_ACCEPT_TO_BOARD);
+            Serial.println("sta: \t [ReAck to board] station accept");
+        }
 
-        stationAckToBoard(PASSENGER_CANCEL);
-        Serial.println("sta: \t [ReAck to board] passenger cancel");
+        if (isBoardReAckPassengerCancel[busID])
+        {
+            isBoardReAckPassengerCancel[busID] = 0;
+
+            stationAckToBoard(busID, PASSENGER_CANCEL);
+            Serial.println("sta: \t [ReAck to board] passenger cancel");
+        }
     }
 }
 
 void cancelProcess(void)
 {
-    if (isPassengerCancel)
+    for (int bus_i = BUS_00; bus_i <= BUS_04; bus_i++)
     {
-        isPassengerCancel = 0;
+        busID = (BUS_ID)bus_i; // Cast integer back to BUS_ID for usage
 
-        stationFsmResetState(BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION);
-        busHandleState = BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION;
+        if (isPassengerCancel[busID])
+        {
+            isPassengerCancel[busID] = 0;
+
+            stationFsmResetState(busID, BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION);
+            busHandleState[busID] = BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION;
+        }
     }
 }
 
-void stationRequestToBus(void)
+void stationRequestToBus(BUS_ID busID)
 {
     stationLoraSendMessage[0] = 0xff;
 
-    stationLoraSendMessage[1] = requestID;
+    stationLoraSendMessage[1] = requestID[busID];
 
     stationLoraSendMessage[2] = (GATEWAY_ADDRESS >> 8) & 0xff; // HIGH
     stationLoraSendMessage[3] = GATEWAY_ADDRESS & 0xff;        // LOW
 
     stationLoraSendMessage[4] = REQUEST_TO_BUS;
-
-    stationLoraSendMessage[5] = REQUESTED_BUS_NUMBER;
+    stationLoraSendMessage[5] = busID;
     stationLoraSendMessage[6] = REQUESTED_BUS_DIRECTION;
     stationLoraSendMessage[7] = STATION_ID;
 
     stationLoraSendMessage[8] = checkSum(stationLoraSendMessage, LORA_PACKAGE_SIZE_SEND);
 
-    e32ttl100.sendBroadcastFixedMessage(BUS_50_CHANEL, stationLoraSendMessage, LORA_PACKAGE_SIZE_SEND + 1);
+    e32ttl100.sendBroadcastFixedMessage(BUS_CHANEL[busID], stationLoraSendMessage, LORA_PACKAGE_SIZE_SEND + 1);
+    // e32ttl100.sendFixedMessage(busResponse.addressHI, busResponse.addressLO, BUS_50_CHANEL, stationLoraSendMessage, LORA_PACKAGE_SIZE_SEND + 1);
 }
 
-void stationAckToBus(SYSTEM_STATE state)
+void stationAckToBus(BUS_ID busID, SYSTEM_STATE state)
 {
     stationLoraSendMessage[0] = 0xff;
 
-    stationLoraSendMessage[1] = requestID;
+    stationLoraSendMessage[1] = requestID[busID];
 
     stationLoraSendMessage[2] = (GATEWAY_ADDRESS >> 8) & 0xff; // HIGH
     stationLoraSendMessage[3] = GATEWAY_ADDRESS & 0xff;        // LOW
 
     stationLoraSendMessage[4] = state;
-    stationLoraSendMessage[5] = 0;
+    stationLoraSendMessage[5] = busID; // Bus number
     stationLoraSendMessage[6] = 0;
     stationLoraSendMessage[7] = 0;
 
     stationLoraSendMessage[8] = checkSum(stationLoraSendMessage, LORA_PACKAGE_SIZE_SEND);
 
     // e32ttl100.sendBroadcastFixedMessage(BUS_50_CHANEL, stationLoraSendMessage, LORA_PACKAGE_SIZE_SEND + 1);
-    e32ttl100.sendFixedMessage(busResponse.addressHI, busResponse.addressLO, BUS_50_CHANEL, stationLoraSendMessage, LORA_PACKAGE_SIZE_SEND + 1);
+    e32ttl100.sendFixedMessage(busResponse[busID].addressHI, busResponse[busID].addressLO, BUS_CHANEL[busID], stationLoraSendMessage, LORA_PACKAGE_SIZE_SEND + 1);
 }
 
-void stationAckToBoard(SYSTEM_STATE state)
+void stationAckToBoard(BUS_ID busID, SYSTEM_STATE state)
 {
-    responseToBoard[0] = state;
-    responseToBoardCRC = CRC16((char *)responseToBoard, 1);
-    responseToBoard[1] = responseToBoardCRC & 0xFF;
-    responseToBoard[2] = responseToBoardCRC >> 8;
-    responseToBoard[3] = '\0';
+    responseToBoard[0] = busID;
+    responseToBoard[1] = state;
+    responseToBoardCRC = CRC16((char *)responseToBoard, 2);
+    responseToBoard[2] = responseToBoardCRC & 0xFF;
+    responseToBoard[3] = responseToBoardCRC >> 8;
+    responseToBoard[4] = '\0';
     rs485_setmode(RS485_TRANSMIT);
-    RS485_Serial.write((const uint8_t *)responseToBoard, 4);
+    RS485_Serial.write((const uint8_t *)responseToBoard, 5);
     rs485_setmode(RS485_RECEIVE);
 }

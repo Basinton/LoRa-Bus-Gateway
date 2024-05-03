@@ -4,7 +4,6 @@
 #include "Arduino.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include <SoftwareSerial.h>
 
 #include "station.h"
 #include "crc16.h"
@@ -14,7 +13,7 @@
 /* Variables -----------------------------------------------------------------*/
 TaskHandle_t rs485TaskHandle = NULL;
 
-int RS485_RX_length                     = 0;
+int RS485_RX_length = 0;
 char RS485_RX_buffer[RS485_RX_BUF_SIZE] = {0};
 
 RS485_MODE RS485_mode = RS485_RECEIVE;
@@ -55,82 +54,88 @@ void rs485_setmode(RS485_MODE RS485_Stt)
     }
 }
 
-void rs485_task(void)
+void rs485_task(void *Pvparameters)
 {
-    static int BOARD_WINDOW_LENGTH = 4;
-
-    RS485_RX_length = RS485_Serial.readBytes(RS485_RX_buffer, RS485_RX_BUF_SIZE);
-    for (int responseIndex = 0; responseIndex < RS485_RX_length / BOARD_WINDOW_LENGTH; ++responseIndex)
+    while (1)
     {
-        int startIndex = responseIndex * BOARD_WINDOW_LENGTH;
+        static int BOARD_WINDOW_LENGTH = 5;
 
-        char *currentResponse = RS485_RX_buffer + startIndex;
-
-        // Serial.print("rs485: \t ");
-        // for (int i = 0; i < BOARD_WINDOW_LENGTH; i++)
-        // {
-        //     Serial.print(currentResponse[i], HEX);
-        //     Serial.print(" ");
-        // }
-        // Serial.println();
-
-        if (CRC16_check(currentResponse, BOARD_WINDOW_LENGTH))
+        RS485_RX_length = RS485_Serial.readBytes(RS485_RX_buffer, RS485_RX_BUF_SIZE);
+        for (int responseIndex = 0; responseIndex < RS485_RX_length / BOARD_WINDOW_LENGTH; ++responseIndex)
         {
-            switch (RS485_RX_buffer[0])
+            int startIndex = responseIndex * BOARD_WINDOW_LENGTH;
+
+            char *currentResponse = RS485_RX_buffer + startIndex;
+
+            // Serial.print("rs485: \t ");
+            // for (int i = 0; i < BOARD_WINDOW_LENGTH; i++)
+            // {
+            //     Serial.print(currentResponse[i], HEX);
+            //     Serial.print(" ");
+            // }
+            // Serial.println();
+
+            if (CRC16_check(currentResponse, BOARD_WINDOW_LENGTH))
             {
+                busID = BUS_ID(currentResponse[0]);
+                switch (currentResponse[1])
+                {
                 case REQUEST_TO_STATION:
-                    if (busHandleState == WAITING)
+                    if (busHandleState[busID] == WAITING)
                     {
-                        isThereRequest  = 1;
+                        isThereRequest[busID] = 1;
                     }
                     else
                     {
-                        isBoardReAckStationAccept = 1;
+                        isBoardReAckStationAccept[busID] = 1;
                     }
+
                     break;
 
                 case BUS_ACCEPT:
-                    if (busHandleState == STATION_NOTIFY_BUS_ACCEPT_TO_BOARD)
+                    if (busHandleState[busID] == STATION_NOTIFY_BUS_ACCEPT_TO_BOARD)
                     {
-                        isNotifyBusAcceptAck = 1;
+                        isNotifyBusAcceptAck[busID] = 1;
                     }
 
                     break;
 
                 case BUS_PASS:
-                    if (busHandleState == STATION_NOTIFY_BUS_PASS_TO_BOARD)
+                    if (busHandleState[busID] == STATION_NOTIFY_BUS_PASS_TO_BOARD)
                     {
-                        isNotifyBusPassAck = 1;
+                        isNotifyBusPassAck[busID] = 1;
                     }
 
                     break;
 
                 case DRIVER_CANCEL:
-                    if (busHandleState == STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD)
+                    if (busHandleState[busID] == STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD)
                     {
-                        isNotifyBusCancelAck = 1;
+                        isNotifyBusCancelAck[busID] = 1;
                     }
 
                     break;
 
                 case PASSENGER_CANCEL:
-                    if (busHandleState != INIT && busHandleState != WAITING && busHandleState != STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD && busHandleState != DRIVER_CANCEL && busHandleState != BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION && busHandleState != PASSENGER_CANCEL)
+                    if (busHandleState[busID] != INIT && busHandleState[busID] != WAITING && busHandleState[busID] != STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD && busHandleState[busID] != DRIVER_CANCEL && busHandleState[busID] != BOARD_NOTIFY_PASSENGER_CANCEL_TO_STATION && busHandleState[busID] != PASSENGER_CANCEL)
                     {
-                        isPassengerCancel = 1;
+                        isPassengerCancel[busID] = 1;
 
                         Serial.println("rs485: \t [passenger cancel]");
                     }
                     else
                     {
-                        isBoardReAckPassengerCancel = 1;
+                        isBoardReAckPassengerCancel[busID] = 1;
                     }
 
                     break;
 
                 default:
                     break;
+                }
             }
         }
+        vTaskDelay(pdMS_TO_TICKS(50)); // Adjust the delay duration as needed
     }
 }
 
@@ -140,7 +145,7 @@ void rs485_init(void)
     pinMode(RS485_EN, OUTPUT);
     rs485_setmode(RS485_RECEIVE);
 
-    // xTaskCreate(rs485_task, "rs485 Task", 8192, NULL, configMAX_PRIORITIES, &rs485TaskHandle);
+    xTaskCreate(rs485_task, "rs485 Task", 8192, NULL, configMAX_PRIORITIES, &rs485TaskHandle);
 
     Serial.println("rs485: \t [init]");
 }

@@ -1,9 +1,8 @@
-#pragma once
 #ifndef __BUTTON_H_
 #define __BUTTON_H_
 
 /* Includes ------------------------------------------------------------------*/
-#include <stdint.h>
+#include "main.h"
 
 /* Define --------------------------------------------------------------------*/
 #define BUTTON_PIN 34

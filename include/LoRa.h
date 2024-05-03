@@ -1,4 +1,3 @@
-#pragma once
 #ifndef __LORA_H_
 #define __LORA_H_
 
@@ -19,13 +18,11 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include <stdint.h>
-#include "Arduino.h"
-#include "LoRa_E32.h"
+#include "main.h"
 
 /* Define --------------------------------------------------------------------*/
 #define LORA_PACKAGE_SIZE_SEND    8
-#define LORA_PACKAGE_SIZE_RECIEVE 5
+#define LORA_PACKAGE_SIZE_RECIEVE 6
 
 #define PIN_M0                    18
 #define PIN_M1                    5
@@ -35,7 +32,7 @@
 extern uint8_t lora_receive[1000];
 extern uint32_t lora_receive_cnt;
 
-extern LoRa_E32 e32ttl100; // Arduino RX <-- e32 TX, Arduino TX --> e32 RX
+extern LoRa_E32 e32ttl100;
 
 /* Functions -----------------------------------------------------------------*/
 uint8_t checkSum(uint8_t *message, int size);
