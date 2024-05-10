@@ -1,0 +1,170 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    /* display: flex; */
+    justify-content: center;
+    align-items: center;
+    /* height: 100vh; */
+    background: #ececec;
+    font-size: 10pt;
+}
+
+.container {
+    /* width: 1400px; */
+    background: white;
+    display: flex;
+    margin-left: 50px;
+    margin-right: 50px;
+    /* box-shadow: 0px 0px 10px 0px rgba(0,0,0,0.5); */
+}
+
+.left-panel,
+.right-panel {
+    padding: 20px;
+}
+
+.left-panel {
+    width: 60%;
+    border-right: 2px solid #dfdfdf;
+}
+
+.right-panel {
+    width: 40%;
+}
+
+h1 {
+    color: #00278a;
+    font-weight: bold;
+    text-align: center;
+    font-size: 30px;
+}
+
+h2 {
+    color: #333;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+ul li {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dfdfdf;
+}
+
+#map {
+    /* height: 460px; */
+    /* width: 520px; */
+    width: 100%;
+    height: 85%;
+    display: flex;
+}
+
+.subcontainer {
+    /* width: 780px; */
+    background: white;
+    display: flex;
+    box-shadow: 0px 0px 10px 0px rgba(224, 221, 221, 0.521);
+    padding-left: 10px;
+    margin-bottom: 20px;
+    border: 2px solid black;
+    border-radius: 15px;
+    background-color: #f7f7f7;
+    /* margin-left: 30px; */
+}
+
+.left,
+.right {
+    float: left;
+    padding-left: 15px;
+    padding-right: 15px;
+    /* display: flex; */
+    /* width: 50%; */
+    width: 50%;
+}
+
+.right {
+    float: right;
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-block-start: auto;
+    /* display: flex;
+    width: 50%; */
+    width: 40%;
+}
+
+
+/* Mobile: width < 600px */
+@media only screen and (max-width: 600px) {
+    body {
+        font-size: 8pt;
+    }
+
+    .container {
+        margin-left: 20px;
+        margin-right: 20px;
+        flex-direction: column;
+    }
+
+    .left-panel {
+        width: 100%;
+    }
+
+    .right-panel {
+        width: 100%;
+    }
+
+    #map {
+        height: 300px;
+        width: 100%;
+        display: flex;
+
+    }
+
+    h1 {
+        font-size: 20px;
+    }
+
+    .subcontainer {
+        display: flex;
+        padding-left: 8px;
+        margin-bottom: 5px;
+    }
+}
+
+/* Tablet: width >= 600px and width < 1024px */
+@media only screen and (min-width: 600px) and (max-width: 1024px) {
+    body {
+        font-size: 9pt;
+    }
+
+    .container {
+        margin-left: 30px;
+        margin-right: 30px;
+    }
+
+    h1 {
+        font-size: 27px;
+    }
+
+    .subcontainer {
+        display: flex;
+        padding-left: 10px;
+        margin-bottom: 15px;
+    }
+
+    .left,
+    .right {
+        padding-left: 12px;
+        padding-right: 12px;
+        width: 320px;
+    }
+}
+
+/* Further styling */

@@ -187,6 +187,7 @@ void stationFsmResetState(BUS_ID busID = BUS_UNKNOWN, SYSTEM_STATE state = INIT)
         break;
 
     case ERROR_TIMEOUT:
+        stationAckToBoard(busID, ERROR_TIMEOUT);
         sprintf(debug_buffer, "sta: bus %d request error - TIMEOUT", busID);
         Serial.println(debug_buffer);
         break;
@@ -241,6 +242,7 @@ void stationFsm(void)
                     errorCount[busID] = 0;
                     stationFsmResetState(busID, ERROR_TIMEOUT);
                     busHandleState[busID] = ERROR_TIMEOUT;
+                    break;
                 }
                 errorCount[busID]++;
                 stationFsmResetState(busID, REQUEST_TO_BUS);
@@ -264,6 +266,7 @@ void stationFsm(void)
                     errorCount[busID] = 0;
                     stationFsmResetState(busID, ERROR_TIMEOUT);
                     busHandleState[busID] = ERROR_TIMEOUT;
+                    break;
                 }
                 errorCount[busID]++;
                 stationFsmResetState(busID, STATION_NOTIFY_BUS_ACCEPT_TO_BOARD);
@@ -307,6 +310,7 @@ void stationFsm(void)
                     errorCount[busID] = 0;
                     stationFsmResetState(busID, ERROR_TIMEOUT);
                     busHandleState[busID] = ERROR_TIMEOUT;
+                    break;
                 }
                 errorCount[busID]++;
                 stationFsmResetState(busID, STATION_NOTIFY_BUS_PASS_TO_BOARD);
@@ -336,6 +340,7 @@ void stationFsm(void)
                     errorCount[busID] = 0;
                     stationFsmResetState(busID, ERROR_TIMEOUT);
                     busHandleState[busID] = ERROR_TIMEOUT;
+                    break;
                 }
                 errorCount[busID]++;
                 stationFsmResetState(busID, STATION_NOTIFY_DRIVER_CANCEL_TO_BOARD);
@@ -370,6 +375,7 @@ void stationFsm(void)
                     errorCount[busID] = 0;
                     stationFsmResetState(busID, ERROR_TIMEOUT);
                     busHandleState[busID] = ERROR_TIMEOUT;
+                    break;
                 }
                 errorCount[busID]++;
                 stationFsmResetState(busID, PASSENGER_CANCEL);

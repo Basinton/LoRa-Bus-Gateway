@@ -22,7 +22,8 @@
 
 /* Define --------------------------------------------------------------------*/
 #define LORA_PACKAGE_SIZE_SEND    8
-#define LORA_PACKAGE_SIZE_RECIEVE 6
+#define LORA_LOCATION_SIZE_RECEIVE   15
+#define LORA_PACKAGE_SIZE_RECEIVE 6
 
 #define PIN_M0                    18
 #define PIN_M1                    5
@@ -37,6 +38,7 @@ extern LoRa_E32 e32ttl100;
 /* Functions -----------------------------------------------------------------*/
 uint8_t checkSum(uint8_t *message, int size);
 void checkDataReceive(void);
+void checkLocationReceive(void);
 void lora_process(void);
 
 void accessModeConfig(void);

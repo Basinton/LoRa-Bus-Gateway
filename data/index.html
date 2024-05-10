@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/jpg" href="favicon.jpg">
+    <title>Bus Information Interface</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+    <link rel="stylesheet" type="text/css" href="style.css">    
+</head>
+
+<body>
+  <h1>HỆ THỐNG THÔNG TIN XE BUÝT</h1>
+
+  <div class="container">
+    <div class="left-panel">
+      <h2>Bus Information</h2>
+      <div class="subcontainer">
+        <div class="left">
+          <ul>
+            <li><strong>Route code: </strong><span class="values" id="bus_route">%ROUTE%</span></li>
+            <li><strong>Driver: </strong><span class="values" id="bus_driver_name">%DRIVER NAME%</span></li>
+            <li><strong>Location: </strong><span class="values" id="bus_location_lat">%LATITUDE%</span>, <span class="values"
+                id="bus_location_lng">%LONGITUDE%</span></li>
+          </ul>
+        </div>
+        <div class="right">
+          <ul>
+            <li><strong>Speed: </strong><span class="values" id="bus_speed">%SPEED%</span> km/h</li>
+            <li><strong>Direction: </strong><span class="values" id="bus_direction">%DIRECTION%</span></li>
+            <li><strong>Next Stop: </strong><span class="values" id="bus_next_stop">%NEXT STOP%</span></li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="subcontainer">
+        <div class="left">
+          <ul>
+            <li><strong>Route code:</strong> 50.1001</li>
+            <li><strong>Driver:</strong> John </li>
+            <li><strong>Location:</strong> 10.77294731697739,
+                106.6549277668601</li>
+          </ul>
+        </div>
+        <div class="right">
+          <ul>
+            <li><strong>Speed:</strong> 30 km/h</li>
+            <li><strong>Direction:</strong> Đi đến Đại học Quốc gia</li>
+            <li><strong>Next Stop:</strong> Bưu Điện Phú Thọ</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="subcontainer">
+        <div class="left">
+          <ul>
+            <li><strong>Route code:</strong> 50.1001</li>
+            <li><strong>Driver:</strong> John </li>
+            <li><strong>Location:</strong> 10.77294731697739,
+                106.6549277668601</li>
+          </ul>
+        </div>
+        <div class="right">
+          <ul>
+            <li><strong>Speed:</strong> 30 km/h</li>
+            <li><strong>Direction:</strong> Đi đến Đại học Quốc gia</li>
+            <li><strong>Next Stop:</strong> Bưu Điện Phú Thọ</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+    <div class="right-panel">
+      <h2>Map</h2>
+      <div id="map">
+        <!-- <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.503278547958!2d106.65699741941452!3d10.772712774689769!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31752ec3c161a3fb%3A0xef77cd47a1cc691e!2zVHLGsOG7nW5nIMSQ4bqhaSBo4buNYyBCw6FjaCBraG9hIC0gxJDhuqFpIGjhu41jIFF14buRYyBnaWEgVFAuSENN!5e0!3m2!1svi!2s!4v1712115703593!5m2!1svi!2s" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>   -->
+      </div>
+    </div>
+
+    <!-- <div id="map"></div> -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

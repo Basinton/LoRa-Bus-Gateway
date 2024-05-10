@@ -9,9 +9,14 @@
 void setup()
 {
     Serial.begin(115200);
+
+    wifi_init();
+
     lora_init();
     led_init();
     button_init();
+
+    dashboard_init();
 
     stationInit();
     rs485_init();

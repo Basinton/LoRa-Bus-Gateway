@@ -6,6 +6,7 @@
 
 /* Variables -----------------------------------------------------------------*/
 uint8_t lora_receive[1000] = {0};
+uint8_t locationBuffer[8] = {0};
 uint32_t lora_receive_cnt = 0;
 
 LoRa_E32 e32ttl100(&Serial2, PIN_AUX, PIN_M0, PIN_M1, UART_BPS_RATE_9600);
@@ -13,6 +14,18 @@ LoRa_E32 e32ttl100(&Serial2, PIN_AUX, PIN_M0, PIN_M1, UART_BPS_RATE_9600);
 TaskHandle_t loraTaskHandle = NULL;
 
 /* Functions -----------------------------------------------------------------*/
+float bytesToFloat(uint8_t *bytes, int start)
+{
+    int32_t temp = (bytes[start] << 24) | (bytes[start + 1] << 16) | (bytes[start + 2] << 8) | bytes[start + 3];
+    return temp / 1000000.0; // Assuming the same scale factor used during transmission
+}
+
+uint16_t bytesToMessageID(uint8_t *bytes, int start)
+{
+    int16_t temp = (bytes[start] << 8) | bytes[start + 1];
+    return temp; // Assuming the same scale factor used during transmission
+}
+
 void lora_task(void *pvParameters)
 {
     while (1)
@@ -47,7 +60,7 @@ void checkDataReceive(void)
     uint8_t checksum;
     uint32_t startDataReach = 0;
 
-    uint32_t sizeOfData = lora_receive_cnt - LORA_PACKAGE_SIZE_RECIEVE;
+    uint32_t sizeOfData = lora_receive_cnt - LORA_PACKAGE_SIZE_RECEIVE;
 
     for (uint32_t i = 0; i < lora_receive_cnt; i++)
     {
@@ -58,8 +71,8 @@ void checkDataReceive(void)
 
         if (lora_receive[i] == 0xFF)
         {
-            checksum = checkSum(&lora_receive[i], LORA_PACKAGE_SIZE_RECIEVE);
-            if (checksum == lora_receive[i + LORA_PACKAGE_SIZE_RECIEVE])
+            checksum = checkSum(&lora_receive[i], LORA_PACKAGE_SIZE_RECEIVE);
+            if (checksum == lora_receive[i + LORA_PACKAGE_SIZE_RECEIVE])
             {
                 busID = BUS_ID(lora_receive[i + BUS_NUMBER]);
                 switch (lora_receive[i + STATE_INDEX])
@@ -106,12 +119,11 @@ void checkDataReceive(void)
                     break;
 
                 default:
-                    Serial.println("Error: Default case entered!");
                     break;
                 }
 
-                startDataReach = i + LORA_PACKAGE_SIZE_RECIEVE + 1;
-                i = i + LORA_PACKAGE_SIZE_RECIEVE;
+                startDataReach = i + LORA_PACKAGE_SIZE_RECEIVE + 1;
+                i = i + LORA_PACKAGE_SIZE_RECEIVE;
             }
             else
             {
@@ -120,6 +132,59 @@ void checkDataReceive(void)
                 // i              = i + LORA_PACKAGE_SIZE_RECIEVE;
             }
         }
+    }
+
+    if (lora_receive_cnt < startDataReach)
+        return;
+
+    for (uint32_t i = 0; i < lora_receive_cnt - startDataReach; i++)
+    {
+        if (i >= (lora_receive_cnt - startDataReach))
+            break;
+        lora_receive[i] = lora_receive[startDataReach + i];
+    }
+    lora_receive_cnt = lora_receive_cnt - startDataReach;
+
+    memset(&lora_receive[lora_receive_cnt], 0x00, 1000 - lora_receive_cnt);
+}
+
+void checkLocationReceive(void)
+{
+    uint8_t status = 0;
+    uint8_t checksum;
+    uint32_t startDataReach = 0;
+
+    uint32_t sizeOfData = lora_receive_cnt - LORA_LOCATION_SIZE_RECEIVE;
+
+    for (uint32_t i = 0; i < lora_receive_cnt; i++)
+    {
+        if (i >= sizeOfData)
+        {
+            break;
+        }
+
+        if (lora_receive[i] == 0xAA)
+        {
+            checksum = checkSum(&lora_receive[i], LORA_LOCATION_SIZE_RECEIVE);
+            if (checksum == lora_receive[i + LORA_LOCATION_SIZE_RECEIVE])
+            {
+                busID = BUS_ID(lora_receive[i + BUS_NUMBER]);
+                if (busID == BUS_00)
+                {
+                    messageID = bytesToMessageID(lora_receive, i + MESSAGE_ID_0);
+
+                    myBus.busLat = bytesToFloat(lora_receive, i + BUS_LAT_0);   // Convert first 4 bytes to float
+                    myBus.busLong = bytesToFloat(lora_receive, i + BUS_LONG_0); // Convert next 4 bytes to float
+
+                    myBus.busSpeed = double(lora_receive[i + BUS_SPEED] / 10);
+                    myBus.busDirection = lora_receive[i + BUS_DIRECTION];
+                    myBus.nowBusStop = lora_receive[i + BUS_NOW_STOP];
+                }
+            }
+        }
+
+        startDataReach = i + LORA_LOCATION_SIZE_RECEIVE + 1;
+        i = i + LORA_LOCATION_SIZE_RECEIVE;
     }
 
     if (lora_receive_cnt < startDataReach)
@@ -160,7 +225,19 @@ void lora_process(void)
         _checkNoData = 0;
     }
 
-    if (lora_receive_cnt > LORA_PACKAGE_SIZE_RECIEVE)
+    // if (lora_receive_cnt == LORA_PACKAGE_SIZE_RECEIVE + 1)
+    // {
+    //     Serial.printf("lora: \t [%d] ", lora_receive_cnt);
+    //     for (size_t i = 0; i < lora_receive_cnt; i++)
+    //     {
+    //         printf("%02X ", lora_receive[i]);
+    //     }
+    //     printf("\n");
+
+    //     checkDataReceive();
+    //     return;
+    // }
+    if (lora_receive_cnt == LORA_LOCATION_SIZE_RECEIVE + 1)
     {
         Serial.printf("lora: \t [%d] ", lora_receive_cnt);
         for (size_t i = 0; i < lora_receive_cnt; i++)
@@ -169,7 +246,7 @@ void lora_process(void)
         }
         printf("\n");
 
-        checkDataReceive();
+        checkLocationReceive();
     }
 }
 

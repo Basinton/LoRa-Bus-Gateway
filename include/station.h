@@ -25,11 +25,37 @@ const uint16_t BUS_CHANEL[BUS_COUNT] = {11, 22, 33, 44, 55};                    
 #define ADDRESS_LO_INDEX 4
 #define STATE_INDEX 5
 
+// /* For testing only ------------------------------------------------------------------*/
+
+#define MESSAGE_ID_0  2
+#define MESSAGE_ID_1  3
+
+#define BUS_LAT_0 4
+#define BUS_LAT_1 5
+#define BUS_LAT_2 6
+#define BUS_LAT_3 7
+
+#define BUS_LONG_0 8
+#define BUS_LONG_1 9
+#define BUS_LONG_2 10
+#define BUS_LONG_3 11
+
+#define BUS_SPEED 12
+#define BUS_DIRECTION   13
+#define BUS_NOW_STOP    14
+
+#define ADDRESS_LOCATION_HI_INDEX 15
+#define ADDRESS_LOCATION_LO_INDEX 16
+
+// /* For testing only ------------------------------------------------------------------*/
+
+
+
 #define REQUEST_TIMEOUT 8000     // Timeout = 160 * 50 = 8000 ms
 
 typedef enum
 {
-    ERROR_TIMEOUT = -1,
+    ERROR_TIMEOUT = 50,
     INIT = 0,
     WAITING = 1,
     REQUEST_TO_STATION = 2,
