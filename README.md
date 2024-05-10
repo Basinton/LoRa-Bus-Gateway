@@ -26,7 +26,7 @@ The LoRa Gateway component receives data from multiple LoRa Nodes and sends it t
      + PIN_M1      Pin 5
      + PIN_AUX     Pin 4
 
-4. **Configuration**
+4. **Configuration**  
    Read the `.h` file for configuration information.
 
 ## Usage
