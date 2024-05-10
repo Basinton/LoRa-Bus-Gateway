@@ -1,9 +1,8 @@
-#pragma once
 #ifndef __RS485_H_
 #define __RS485_H_
 
 /* Includes ------------------------------------------------------------------*/
-#include <SoftwareSerial.h>
+#include "main.h"
 
 /* Define --------------------------------------------------------------------*/
 #define RS485_RX_BUF_SIZE (1024 + 1)

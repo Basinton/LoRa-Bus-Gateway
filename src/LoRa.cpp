@@ -2,20 +2,30 @@
 #include "lora.h"
 #include "station.h"
 
-#include "Arduino.h"
-#include "LoRa_E32.h"
-
 /* Define --------------------------------------------------------------------*/
 
 /* Variables -----------------------------------------------------------------*/
 uint8_t lora_receive[1000] = {0};
-uint32_t lora_receive_cnt  = 0;
+uint8_t locationBuffer[8] = {0};
+uint32_t lora_receive_cnt = 0;
 
 LoRa_E32 e32ttl100(&Serial2, PIN_AUX, PIN_M0, PIN_M1, UART_BPS_RATE_9600);
 
 TaskHandle_t loraTaskHandle = NULL;
 
 /* Functions -----------------------------------------------------------------*/
+float bytesToFloat(uint8_t *bytes, int start)
+{
+    int32_t temp = (bytes[start] << 24) | (bytes[start + 1] << 16) | (bytes[start + 2] << 8) | bytes[start + 3];
+    return temp / 1000000.0; // Assuming the same scale factor used during transmission
+}
+
+uint16_t bytesToMessageID(uint8_t *bytes, int start)
+{
+    int16_t temp = (bytes[start] << 8) | bytes[start + 1];
+    return temp; // Assuming the same scale factor used during transmission
+}
+
 void lora_task(void *pvParameters)
 {
     while (1)
@@ -50,7 +60,7 @@ void checkDataReceive(void)
     uint8_t checksum;
     uint32_t startDataReach = 0;
 
-    uint32_t sizeOfData = lora_receive_cnt - LORA_PACKAGE_SIZE_RECIEVE;
+    uint32_t sizeOfData = lora_receive_cnt - LORA_PACKAGE_SIZE_RECEIVE;
 
     for (uint32_t i = 0; i < lora_receive_cnt; i++)
     {
@@ -59,60 +69,61 @@ void checkDataReceive(void)
             break;
         }
 
-        if (lora_receive[i] == 0xff)
+        if (lora_receive[i] == 0xFF)
         {
-            checksum = checkSum(&lora_receive[i], LORA_PACKAGE_SIZE_RECIEVE);
-            if (checksum == lora_receive[i + LORA_PACKAGE_SIZE_RECIEVE])
+            checksum = checkSum(&lora_receive[i], LORA_PACKAGE_SIZE_RECEIVE);
+            if (checksum == lora_receive[i + LORA_PACKAGE_SIZE_RECEIVE])
             {
+                busID = BUS_ID(lora_receive[i + BUS_NUMBER]);
                 switch (lora_receive[i + STATE_INDEX])
                 {
-                    case BUS_ACCEPT:
-                        if (busHandleState == REQUEST_TO_BUS)
-                        {
-                            busResponse.id        = lora_receive[i + ID_INDEX];
-                            busResponse.addressHI = lora_receive[i + ADDRESS_HI_INDEX];
-                            busResponse.addressLO = lora_receive[i + ADDRESS_LO_INDEX];
+                case BUS_ACCEPT:
+                    if (busHandleState[busID] == REQUEST_TO_BUS)
+                    {
+                        busResponse[busID].id = lora_receive[i + ID_INDEX];
+                        busResponse[busID].addressHI = lora_receive[i + ADDRESS_HI_INDEX];
+                        busResponse[busID].addressLO = lora_receive[i + ADDRESS_LO_INDEX];
 
-                            isBusAccept = 1;
-                        }
-                        break;
+                        isBusAccept[busID] = 1;
+                    }
+                    break;
 
-                    case BUS_PASS:
-                        if (busHandleState == BUS_ACCEPT)
-                        {
-                            isBusPass = 1;
-                        }
-                        else
-                        {
-                            isBusReAckBusPass = 1;
-                        }
-                        break;
+                case BUS_PASS:
+                    if (busHandleState[busID] == BUS_ACCEPT)
+                    {
+                        isBusPass[busID] = 1;
+                    }
+                    else
+                    {
+                        isBusReAckBusPass[busID] = 1;
+                    }
+                    break;
 
-                    case DRIVER_CANCEL:
-                        if (busHandleState == BUS_ACCEPT)
-                        {
-                            isThereBusCancel = 1;
-                        }
-                        else
-                        {
-                            isBusReAckBusCancel = 1;
-                        }
-                        break;
+                case DRIVER_CANCEL:
+                    if (busHandleState[busID] == BUS_ACCEPT)
+                    {
+                        isThereBusCancel[busID] = 1;
+                    }
+                    else
+                    {
+                        isBusReAckBusCancel[busID] = 1;
+                    }
+                    break;
 
-                    case PASSENGER_CANCEL:
-                        if (busHandleState == PASSENGER_CANCEL)
-                        {
-                            isPassengerCancelAck = 1;
-                        }
+                case PASSENGER_CANCEL:
+                    if (busHandleState[busID] == PASSENGER_CANCEL)
+                    {
+                        isPassengerCancelAck[busID] = 1;
+                    }
 
-                        break;
+                    break;
 
-                    default:
-                        break;
+                default:
+                    break;
                 }
 
-                startDataReach = i + LORA_PACKAGE_SIZE_RECIEVE + 1;
-                i              = i + LORA_PACKAGE_SIZE_RECIEVE;
+                startDataReach = i + LORA_PACKAGE_SIZE_RECEIVE + 1;
+                i = i + LORA_PACKAGE_SIZE_RECEIVE;
             }
             else
             {
@@ -137,19 +148,72 @@ void checkDataReceive(void)
     memset(&lora_receive[lora_receive_cnt], 0x00, 1000 - lora_receive_cnt);
 }
 
+void checkLocationReceive(void)
+{
+    uint8_t status = 0;
+    uint8_t checksum;
+    uint32_t startDataReach = 0;
+
+    uint32_t sizeOfData = lora_receive_cnt - LORA_LOCATION_SIZE_RECEIVE;
+
+    for (uint32_t i = 0; i < lora_receive_cnt; i++)
+    {
+        if (i >= sizeOfData)
+        {
+            break;
+        }
+
+        if (lora_receive[i] == 0xAA)
+        {
+            checksum = checkSum(&lora_receive[i], LORA_LOCATION_SIZE_RECEIVE);
+            if (checksum == lora_receive[i + LORA_LOCATION_SIZE_RECEIVE])
+            {
+                busID = BUS_ID(lora_receive[i + BUS_NUMBER]);
+                if (busID == BUS_00)
+                {
+                    messageID = bytesToMessageID(lora_receive, i + MESSAGE_ID_0);
+
+                    myBus.busLat = bytesToFloat(lora_receive, i + BUS_LAT_0);   // Convert first 4 bytes to float
+                    myBus.busLong = bytesToFloat(lora_receive, i + BUS_LONG_0); // Convert next 4 bytes to float
+
+                    myBus.busSpeed = double(lora_receive[i + BUS_SPEED] / 10);
+                    myBus.busDirection = lora_receive[i + BUS_DIRECTION];
+                    myBus.nowBusStop = lora_receive[i + BUS_NOW_STOP];
+                }
+            }
+        }
+
+        startDataReach = i + LORA_LOCATION_SIZE_RECEIVE + 1;
+        i = i + LORA_LOCATION_SIZE_RECEIVE;
+    }
+
+    if (lora_receive_cnt < startDataReach)
+        return;
+
+    for (uint32_t i = 0; i < lora_receive_cnt - startDataReach; i++)
+    {
+        if (i >= (lora_receive_cnt - startDataReach))
+            break;
+        lora_receive[i] = lora_receive[startDataReach + i];
+    }
+    lora_receive_cnt = lora_receive_cnt - startDataReach;
+
+    memset(&lora_receive[lora_receive_cnt], 0x00, 1000 - lora_receive_cnt);
+}
+
 void lora_process(void)
 {
     static uint32_t _checkNoData = 0;
 
     if (e32ttl100.available() > 1)
     {
-        _checkNoData         = 0;
+        _checkNoData = 0;
         ResponseContainer rs = e32ttl100.receiveMessage();
 
         for (uint32_t i = 0; i < rs.data.length(); i++)
         {
             lora_receive[lora_receive_cnt] = rs.data[i];
-            lora_receive_cnt               = (lora_receive_cnt + 1) % 1000;
+            lora_receive_cnt = (lora_receive_cnt + 1) % 1000;
         }
     }
     else
@@ -158,19 +222,31 @@ void lora_process(void)
     if (_checkNoData > 1)
     {
         lora_receive_cnt = 0;
-        _checkNoData     = 0;
+        _checkNoData = 0;
     }
 
-    if (lora_receive_cnt > LORA_PACKAGE_SIZE_RECIEVE)
-    {
-        // Serial.printf("lora: \t [%d] ", lora_receive_cnt);
-        // for (size_t i = 0; i < lora_receive_cnt; i++)
-        // {
-        //     printf("%02X ", lora_receive[i]);
-        // }
-        // printf("\n");
+    // if (lora_receive_cnt == LORA_PACKAGE_SIZE_RECEIVE + 1)
+    // {
+    //     Serial.printf("lora: \t [%d] ", lora_receive_cnt);
+    //     for (size_t i = 0; i < lora_receive_cnt; i++)
+    //     {
+    //         printf("%02X ", lora_receive[i]);
+    //     }
+    //     printf("\n");
 
-        checkDataReceive();
+    //     checkDataReceive();
+    //     return;
+    // }
+    if (lora_receive_cnt == LORA_LOCATION_SIZE_RECEIVE + 1)
+    {
+        Serial.printf("lora: \t [%d] ", lora_receive_cnt);
+        for (size_t i = 0; i < lora_receive_cnt; i++)
+        {
+            printf("%02X ", lora_receive[i]);
+        }
+        printf("\n");
+
+        checkLocationReceive();
     }
 }
 
@@ -204,15 +280,15 @@ void setConfig(uint16_t address, uint16_t channel, uint8_t airRate, uint8_t powe
     configuration.ADDH = (address >> 8) & 0xff;
     configuration.CHAN = channel;
 
-    configuration.OPTION.fec                = FEC_1_ON;
-    configuration.OPTION.fixedTransmission  = FT_FIXED_TRANSMISSION;
-    configuration.OPTION.ioDriveMode        = IO_D_MODE_PUSH_PULLS_PULL_UPS;
-    configuration.OPTION.transmissionPower  = power;
+    configuration.OPTION.fec = FEC_1_ON;
+    configuration.OPTION.fixedTransmission = FT_FIXED_TRANSMISSION;
+    configuration.OPTION.ioDriveMode = IO_D_MODE_PUSH_PULLS_PULL_UPS;
+    configuration.OPTION.transmissionPower = power;
     configuration.OPTION.wirelessWakeupTime = WAKE_UP_250;
 
-    configuration.SPED.airDataRate  = airRate;
+    configuration.SPED.airDataRate = airRate;
     configuration.SPED.uartBaudRate = UART_BPS_9600;
-    configuration.SPED.uartParity   = MODE_00_8N1;
+    configuration.SPED.uartParity = MODE_00_8N1;
 
     // Set configuration changed and set to not hold the configuration
     ResponseStatus rs = e32ttl100.setConfiguration(configuration, WRITE_CFG_PWR_DWN_SAVE);
