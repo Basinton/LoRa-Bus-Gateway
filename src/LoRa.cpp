@@ -1,6 +1,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "lora.h"
 #include "station.h"
+// #include "server.h"
 
 /* Define --------------------------------------------------------------------*/
 
@@ -9,15 +10,26 @@ uint8_t lora_receive[1000] = {0};
 uint8_t locationBuffer[8] = {0};
 uint32_t lora_receive_cnt = 0;
 
+bool isBus50Ready = 0;
+bool isBus08Ready = 0;
+
 LoRa_E32 e32ttl100(&Serial2, PIN_AUX, PIN_M0, PIN_M1, UART_BPS_RATE_9600);
 
 TaskHandle_t loraTaskHandle = NULL;
+
+volatile bool isBusDataReceive = 0;
 
 /* Functions -----------------------------------------------------------------*/
 float bytesToFloat(uint8_t *bytes, int start)
 {
     int32_t temp = (bytes[start] << 24) | (bytes[start + 1] << 16) | (bytes[start + 2] << 8) | bytes[start + 3];
     return temp / 1000000.0; // Assuming the same scale factor used during transmission
+}
+
+float distanceToFloat(uint8_t *bytes, int start)
+{
+    int16_t temp = (bytes[start] << 8) | bytes[start + 1];
+    return temp / 10.0; // Assuming the same scale factor used during transmission
 }
 
 uint16_t bytesToMessageID(uint8_t *bytes, int start)
@@ -41,7 +53,7 @@ void lora_init(void)
     e32ttl100.begin();
     setConfig(GATEWAY_ADDRESS, GATEWAY_CHANNEL, AIR_DATA_RATE_000_03, POWER_20);
 
-    xTaskCreate(lora_task, "lora task", 8192, NULL, configMAX_PRIORITIES, &loraTaskHandle);
+    xTaskCreate(lora_task, "lora task", 2048, NULL, configMAX_PRIORITIES, &loraTaskHandle);
 
     Serial.println("lora: \t [init]");
 }
@@ -169,16 +181,35 @@ void checkLocationReceive(void)
             if (checksum == lora_receive[i + LORA_LOCATION_SIZE_RECEIVE])
             {
                 busID = BUS_ID(lora_receive[i + BUS_NUMBER]);
-                if (busID == BUS_00)
+                if (busID == BUS_50)
                 {
-                    messageID = bytesToMessageID(lora_receive, i + MESSAGE_ID_0);
+                    bus50.messageID = bytesToMessageID(lora_receive, i + MESSAGE_ID_0);
 
-                    myBus.busLat = bytesToFloat(lora_receive, i + BUS_LAT_0);   // Convert first 4 bytes to float
-                    myBus.busLong = bytesToFloat(lora_receive, i + BUS_LONG_0); // Convert next 4 bytes to float
+                    bus50.busLat = bytesToFloat(lora_receive, i + BUS_LAT_0);   // Convert first 4 bytes to float
+                    bus50.busLong = bytesToFloat(lora_receive, i + BUS_LONG_0); // Convert next 4 bytes to float
 
-                    myBus.busSpeed = double(lora_receive[i + BUS_SPEED] / 10);
-                    myBus.busDirection = lora_receive[i + BUS_DIRECTION];
-                    myBus.nowBusStop = lora_receive[i + BUS_NOW_STOP];
+                    bus50.busSpeed = double(lora_receive[i + BUS_SPEED] / 10);
+
+                    bus50.busDistance = distanceToFloat(lora_receive, i + BUS_DISTANCE_0);
+                    // bus50.busDirection = lora_receive[i + BUS_DIRECTION];
+                    // bus50.nowBusStop = lora_receive[i + BUS_NOW_STOP];
+
+                    isBus50Ready = 1;
+                }
+                else if (busID == BUS_08)
+                {
+                    bus08.messageID = bytesToMessageID(lora_receive, i + MESSAGE_ID_0);
+
+                    bus08.busLat = bytesToFloat(lora_receive, i + BUS_LAT_0);   // Convert first 4 bytes to float
+                    bus08.busLong = bytesToFloat(lora_receive, i + BUS_LONG_0); // Convert next 4 bytes to float
+
+                    bus08.busSpeed = double(lora_receive[i + BUS_SPEED] / 10);
+
+                    bus08.busDistance = distanceToFloat(lora_receive, i + BUS_DISTANCE_0);
+                    // bus08.busDirection = lora_receive[i + BUS_DIRECTION];
+                    // bus08.nowBusStop = lora_receive[i + BUS_NOW_STOP];
+
+                    isBus08Ready = 1;
                 }
             }
         }
@@ -225,19 +256,20 @@ void lora_process(void)
         _checkNoData = 0;
     }
 
-    // if (lora_receive_cnt == LORA_PACKAGE_SIZE_RECEIVE + 1)
-    // {
-    //     Serial.printf("lora: \t [%d] ", lora_receive_cnt);
-    //     for (size_t i = 0; i < lora_receive_cnt; i++)
-    //     {
-    //         printf("%02X ", lora_receive[i]);
-    //     }
-    //     printf("\n");
+    if (lora_receive_cnt == LORA_PACKAGE_SIZE_RECEIVE + 1)
+    {
+        isBusDataReceive = 1;
+        Serial.printf("lora: \t [%d] ", lora_receive_cnt);
+        for (size_t i = 0; i < lora_receive_cnt; i++)
+        {
+            printf("%02X ", lora_receive[i]);
+        }
+        printf("\n");
 
-    //     checkDataReceive();
-    //     return;
-    // }
-    if (lora_receive_cnt == LORA_LOCATION_SIZE_RECEIVE + 1)
+        checkDataReceive();
+        isBusDataReceive = 0;
+    }
+    if (lora_receive_cnt == LORA_LOCATION_SIZE_RECEIVE + 1 && isBusDataReceive == 0)
     {
         Serial.printf("lora: \t [%d] ", lora_receive_cnt);
         for (size_t i = 0; i < lora_receive_cnt; i++)

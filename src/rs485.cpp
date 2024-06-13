@@ -145,7 +145,7 @@ void rs485_init(void)
     pinMode(RS485_EN, OUTPUT);
     rs485_setmode(RS485_RECEIVE);
 
-    xTaskCreate(rs485_task, "rs485 Task", 8192, NULL, configMAX_PRIORITIES, &rs485TaskHandle);
+    xTaskCreate(rs485_task, "rs485 Task", 8192, NULL, configMAX_PRIORITIES - 1, &rs485TaskHandle);
 
     Serial.println("rs485: \t [init]");
 }

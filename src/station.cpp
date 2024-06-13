@@ -78,7 +78,7 @@ void stationTask(void *pvParameters)
 
 void stationInit(void)
 {
-    xTaskCreate(stationTask, "Main process of Station", 8192, NULL, configMAX_PRIORITIES - 1, &stationTaskHandle);
+    xTaskCreate(stationTask, "Main process of Station", 4096, NULL, configMAX_PRIORITIES, &stationTaskHandle);
 
     Serial.println("sta: \t [init]");
 }
@@ -112,6 +112,17 @@ void stationFsmResetState(BUS_ID busID = BUS_UNKNOWN, SYSTEM_STATE state = INIT)
         break;
 
     case REQUEST_TO_BUS:
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            if (busID == 0)
+            {
+                requestBus("Q10 055", "50");
+            }
+            else if (busID == 4)
+            {
+                requestBus("QTD 253", "08");
+            }
+        }
         stationRequestToBus(busID);
         busHandleTimeout[busID] = 40;
 
@@ -128,6 +139,17 @@ void stationFsmResetState(BUS_ID busID = BUS_UNKNOWN, SYSTEM_STATE state = INIT)
         break;
 
     case BUS_ACCEPT:
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            if (busID == BUS_50)
+            {
+                updateRequestBus("Q10 055", "50", "2");
+            }
+            else if (busID == BUS_08)
+            {
+                updateRequestBus("QTD 253", "08", "2");
+            }
+        }
         // Serial.printf("sta: \t [fsm] bus accept (request id=%d, hi=%d, lo=%d)\n", busResponse.id, busResponse.addressHI, busResponse.addressLO);
         sprintf(debug_buffer, "sta: bus %d accept", busID);
         Serial.println(debug_buffer);
@@ -142,6 +164,17 @@ void stationFsmResetState(BUS_ID busID = BUS_UNKNOWN, SYSTEM_STATE state = INIT)
         break;
 
     case BUS_PASS:
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            if (busID == BUS_50)
+            {
+                updateRequestBus("Q10 055", "50", "3");
+            }
+            else if (busID == BUS_08)
+            {
+                updateRequestBus("QTD 253", "08", "3");
+            }
+        }
         stationAckToBus(busID, BUS_PASS);
 
         sprintf(debug_buffer, "sta: bus %d pass", busID);
@@ -157,6 +190,17 @@ void stationFsmResetState(BUS_ID busID = BUS_UNKNOWN, SYSTEM_STATE state = INIT)
         break;
 
     case DRIVER_CANCEL:
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            if (busID == BUS_50)
+            {
+                updateRequestBus("Q10 055", "50", "4");
+            }
+            else if (busID == BUS_08)
+            {
+                updateRequestBus("QTD 253", "08", "4");
+            }
+        }
         stationAckToBus(busID, DRIVER_CANCEL);
         busHandleTimeout[busID] = 40;
 
@@ -172,6 +216,17 @@ void stationFsmResetState(BUS_ID busID = BUS_UNKNOWN, SYSTEM_STATE state = INIT)
         break;
 
     case PASSENGER_CANCEL:
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            if (busID == BUS_50)
+            {
+                updateRequestBus("Q10 055", "50", "5");
+            }
+            else if (busID == BUS_08)
+            {
+                updateRequestBus("QTD 253", "08", "5");
+            }
+        }
         stationAckToBus(busID, PASSENGER_CANCEL);
         busHandleTimeout[busID] = 40;
 
@@ -199,7 +254,7 @@ void stationFsmResetState(BUS_ID busID = BUS_UNKNOWN, SYSTEM_STATE state = INIT)
 
 void stationFsm(void)
 {
-    for (int bus_i = BUS_00; bus_i <= BUS_04; bus_i++)
+    for (int bus_i = BUS_50; bus_i <= BUS_08; bus_i++)
     {
         busID = (BUS_ID)bus_i; // Cast integer back to BUS_ID for usage
         switch (busHandleState[busID])
@@ -403,7 +458,7 @@ void stationFsm(void)
 
 void stationAckDebuger(void)
 {
-    for (int bus_i = BUS_00; bus_i <= BUS_04; bus_i++)
+    for (int bus_i = BUS_50; bus_i <= BUS_08; bus_i++)
     {
         busID = (BUS_ID)bus_i; // Cast integer back to BUS_ID for usage
 
@@ -427,7 +482,7 @@ void stationAckDebuger(void)
 
 void boardAckDebuger(void)
 {
-    for (int bus_i = BUS_00; bus_i <= BUS_04; bus_i++)
+    for (int bus_i = BUS_50; bus_i <= BUS_08; bus_i++)
     {
         busID = (BUS_ID)bus_i; // Cast integer back to BUS_ID for usage
 
@@ -451,7 +506,7 @@ void boardAckDebuger(void)
 
 void cancelProcess(void)
 {
-    for (int bus_i = BUS_00; bus_i <= BUS_04; bus_i++)
+    for (int bus_i = BUS_50; bus_i <= BUS_08; bus_i++)
     {
         busID = (BUS_ID)bus_i; // Cast integer back to BUS_ID for usage
 
@@ -467,12 +522,12 @@ void cancelProcess(void)
 
 void stationRequestToBus(BUS_ID busID)
 {
-    stationLoraSendMessage[0] = 0xff;
+    stationLoraSendMessage[0] = 0xFF;
 
     stationLoraSendMessage[1] = requestID[busID];
 
-    stationLoraSendMessage[2] = (GATEWAY_ADDRESS >> 8) & 0xff; // HIGH
-    stationLoraSendMessage[3] = GATEWAY_ADDRESS & 0xff;        // LOW
+    stationLoraSendMessage[2] = (GATEWAY_ADDRESS >> 8) & 0xFF; // HIGH
+    stationLoraSendMessage[3] = GATEWAY_ADDRESS & 0xFF;        // LOW
 
     stationLoraSendMessage[4] = REQUEST_TO_BUS;
     stationLoraSendMessage[5] = busID;
@@ -487,12 +542,12 @@ void stationRequestToBus(BUS_ID busID)
 
 void stationAckToBus(BUS_ID busID, SYSTEM_STATE state)
 {
-    stationLoraSendMessage[0] = 0xff;
+    stationLoraSendMessage[0] = 0xFF;
 
     stationLoraSendMessage[1] = requestID[busID];
 
-    stationLoraSendMessage[2] = (GATEWAY_ADDRESS >> 8) & 0xff; // HIGH
-    stationLoraSendMessage[3] = GATEWAY_ADDRESS & 0xff;        // LOW
+    stationLoraSendMessage[2] = (GATEWAY_ADDRESS >> 8) & 0xFF; // HIGH
+    stationLoraSendMessage[3] = GATEWAY_ADDRESS & 0xFF;        // LOW
 
     stationLoraSendMessage[4] = state;
     stationLoraSendMessage[5] = busID; // Bus number

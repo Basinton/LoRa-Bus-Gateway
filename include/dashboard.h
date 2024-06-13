@@ -3,6 +3,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "global.h"
 /* Define --------------------------------------------------------------------*/
 // SSID and password for AP Mode
 #define DEFAULT_AP_SSID "LORA_TESTING"
@@ -11,6 +12,8 @@
 // SSID and password for STA Mode
 #define DEFAULT_STA_SSID "BKIT_LUGIA_CS2"
 #define DEFAULT_STA_PASSWORD "cselabc5c6"
+
+// extern char *websocket_server_test;
 
 // Define a structure to represent a location
 struct Stations

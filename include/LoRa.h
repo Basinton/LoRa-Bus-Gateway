@@ -18,8 +18,11 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
-
+#include <stdint.h>
+#include <stdio.h>
+#include <Arduino.h>
+#include <LoRa_E32.h>
+#include "global.h"
 /* Define --------------------------------------------------------------------*/
 #define LORA_PACKAGE_SIZE_SEND    8
 #define LORA_LOCATION_SIZE_RECEIVE   15

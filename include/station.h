@@ -3,7 +3,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
+#include "server.h"
 /* Define --------------------------------------------------------------------*/
 #define STATION_ID 1
 
@@ -11,7 +11,7 @@ const uint16_t GATEWAY_ADDRESS = 0x0001;
 const uint16_t GATEWAY_CHANNEL = 1;
 
 const uint16_t BUS_ADDRESS[BUS_COUNT] = {0x0001, 0x0010, 0x0011, 0x0100, 0x0101}; //Node's Addresses
-const uint16_t BUS_CHANEL[BUS_COUNT] = {11, 22, 33, 44, 55};                      //Node's Channels
+const uint16_t BUS_CHANEL[BUS_COUNT] = {10, 15, 20, 25, 30};                      //Node's Channels
 
 #define REQUESTED_BUS_DIRECTION 1
 #define REQUESTED_BUS_NUMBER 50
@@ -41,15 +41,17 @@ const uint16_t BUS_CHANEL[BUS_COUNT] = {11, 22, 33, 44, 55};                    
 #define BUS_LONG_3 11
 
 #define BUS_SPEED 12
-#define BUS_DIRECTION   13
-#define BUS_NOW_STOP    14
+
+#define BUS_DISTANCE_0   13
+#define BUS_DISTANCE_1   14
+
+// #define BUS_DIRECTION   13
+// #define BUS_NOW_STOP    14
 
 #define ADDRESS_LOCATION_HI_INDEX 15
 #define ADDRESS_LOCATION_LO_INDEX 16
 
 // /* For testing only ------------------------------------------------------------------*/
-
-
 
 #define REQUEST_TIMEOUT 8000     // Timeout = 160 * 50 = 8000 ms
 
